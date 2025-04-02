@@ -66,4 +66,75 @@ export function updateDocument(collection: Collection, query: any, update: any):
       .success((doc: any) => resolve(doc))
       .error((err: Error) => reject(err));
   });
+}
+
+/**
+ * Promisificar uma operação de remoção do Monk
+ * @param collection - Coleção do banco de dados
+ * @param query - Query para selecionar documentos a serem removidos
+ * @returns Promise que resolve com o resultado da remoção ou rejeita com erro
+ */
+export function removeDocument(collection: Collection, query: any): Promise<any> {
+  return new Promise((resolve, reject) => {
+    collection.remove(query)
+      .success((result: any) => resolve(result))
+      .error((err: Error) => reject(err));
+  });
+}
+
+/**
+ * Promisificar uma operação de busca do Monk
+ * @param collection - Coleção do banco de dados
+ * @param query - Query para selecionar documentos
+ * @param options - Opções adicionais como sort, limit, etc.
+ * @returns Promise que resolve com os documentos encontrados ou rejeita com erro
+ */
+export function findDocuments(collection: Collection, query: any = {}, options: any = {}): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    collection.find(query, options)
+      .success((docs: any[]) => resolve(docs))
+      .error((err: Error) => reject(err));
+  });
+}
+
+/**
+ * Promisificar uma operação de busca de um único documento do Monk
+ * @param collection - Coleção do banco de dados
+ * @param query - Query para selecionar o documento
+ * @param options - Opções adicionais
+ * @returns Promise que resolve com o documento encontrado ou rejeita com erro
+ */
+export function findOneDocument(collection: Collection, query: any, options: any = {}): Promise<any> {
+  return new Promise((resolve, reject) => {
+    collection.findOne(query, options)
+      .success((doc: any) => resolve(doc))
+      .error((err: Error) => reject(err));
+  });
+}
+
+/**
+ * Executa uma ação no banco de dados com tratamento adequado de erros
+ * @param action - Função assíncrona a ser executada
+ * @param res - Objeto Response do Express
+ * @param successMessage - Mensagem de sucesso opcional
+ * @param errorMessage - Mensagem de erro personalizada
+ * @returns Promise<boolean> - true se a operação foi bem-sucedida, false caso contrário
+ */
+export async function executeDbAction(
+  action: () => Promise<any>,
+  res: Response,
+  successMessage?: string,
+  errorMessage: string = 'Database operation failed'
+): Promise<boolean> {
+  try {
+    await action();
+    if (successMessage) {
+      res.json({ success: true, message: successMessage });
+    }
+    return true;
+  } catch (error) {
+    console.error(`${errorMessage}:`, error);
+    res.status(500).json({ error: errorMessage });
+    return false;
+  }
 } 

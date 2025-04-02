@@ -2,5 +2,5 @@ projectKey=Sistema-Restaurante-Cursor
 serverUrl=http://localhost:9000
 serverVersion=25.3.0.104237
 dashboardUrl=http://localhost:9000/dashboard?id=Sistema-Restaurante-Cursor
-ceTaskId=89f8fdb7-c4d7-4385-a100-7b6731087140
-ceTaskUrl=http://localhost:9000/api/ce/task?id=89f8fdb7-c4d7-4385-a100-7b6731087140
+ceTaskId=2bf070b3-af03-4f5a-8f96-bc215373bcf6
+ceTaskUrl=http://localhost:9000/api/ce/task?id=2bf070b3-af03-4f5a-8f96-bc215373bcf6
