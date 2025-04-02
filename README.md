@@ -26,3 +26,45 @@ Primera versión:
 
 Desarrollado por www.edinsoncs.com
 
+## Migração para TypeScript
+
+Este projeto está sendo migrado de JavaScript para TypeScript para melhorar a segurança, escalabilidade e legibilidade do código.
+
+### Estrutura do Projeto em TypeScript
+
+A estrutura do projeto TypeScript está organizada da seguinte forma:
+
+```
+/src              - Código fonte TypeScript
+  /bin            - Scripts de inicialização
+  /models         - Modelos de dados
+  /routes         - Rotas da aplicação
+  /types          - Definições de tipos e interfaces
+/dist             - Código compilado (gerado pelo TypeScript)
+/views            - Templates Jade/Pug
+/public           - Arquivos estáticos
+```
+
+### Instalação
+
+```bash
+# Instalar dependências
+npm install
+
+# Compilar TypeScript
+npm run build
+
+# Iniciar o servidor
+npm start
+
+# Iniciar em modo de desenvolvimento
+npm run dev
+```
+
+### Principais Melhorias com TypeScript
+
+1. **Tipagem Estática**: Todos os modelos, rotas e funções agora têm tipos explícitos.
+2. **Interfaces**: Uso de interfaces para definir estruturas de dados reutilizáveis.
+3. **Melhor Segurança**: Redução do uso de `any` e maior segurança no código.
+4. **Melhor IDE Support**: Autocompletar e detecção de erros durante o desenvolvimento.
+

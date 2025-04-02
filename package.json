@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www"
+    "start": "node ./dist/bin/www",
+    "build": "tsc",
+    "dev": "tsc --watch & nodemon ./dist/bin/www",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "body-parser": "~1.20.2",
@@ -28,5 +31,22 @@
     "typescript": "~3.1.5",
     "webpack": "~4.23.1",
     "webpack-cli": "~3.1.2"
+  },
+  "devDependencies": {
+    "@types/body-parser": "^1.19.0",
+    "@types/cookie-parser": "^1.4.2",
+    "@types/debug": "^4.1.5",
+    "@types/express": "^4.17.9",
+    "@types/express-session": "^1.17.3",
+    "@types/mongodb": "^3.6.3",
+    "@types/mongoose": "^5.10.3",
+    "@types/morgan": "^1.9.2",
+    "@types/node": "^14.14.14",
+    "@types/passport": "^1.0.4",
+    "@types/passport-local": "^1.0.33",
+    "@types/react": "^16.9.56",
+    "@types/react-dom": "^16.9.9",
+    "@types/serve-favicon": "^2.5.2",
+    "nodemon": "^2.0.6"
   }
 }
