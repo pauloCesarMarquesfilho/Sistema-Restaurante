@@ -1,6 +1,6 @@
 import express, { Response, NextFunction, Router } from 'express';
-import mongoose from 'mongoose';
-import { IUserRequest } from '../types';
+import { IUserRequest, IVenta } from '../types';
+import { validateCollection, insertDocument, findDocuments, executeDbAction } from '../utils/dbHelpers';
 
 const router: Router = express.Router();
 
@@ -39,50 +39,77 @@ router.get('/mensual', (req: IUserRequest, res: Response, next: NextFunction) =>
   });
 });
 
-router.get('/mensual/principal', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const total = db?.get('total');
-  const fechaPrincipal = req.params.principal;
-  const fechaFinal = req.params.fin;
+router.get('/mensual/principal', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
+    }
+    
+    const total = db.get('total');
+    const fechaPrincipal = req.params.principal;
+    const fechaFinal = req.params.fin;
 
-  if (!total) {
-    return res.status(500).json({ error: 'Database collection not available' });
+    // Verificar se a coleção está disponível
+    if (!validateCollection(total, res)) {
+      return;
+    }
+
+    // Consultar vendas no período especificado
+    await executeDbAction(
+      async () => {
+        const ventas = await findDocuments(
+          total,
+          {
+            'Fecha': {
+              '$gte': '2016-02-01T05:54:20.743Z',
+              '$lt': '2016-02-02T06:13:16.074Z'
+            }
+          }
+        );
+        res.json(ventas);
+      },
+      res,
+      undefined,
+      'Erro ao buscar vendas do período'
+    );
+  } catch (error) {
+    console.error('Erro na rota /mensual/principal:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao buscar vendas mensais' });
   }
-
-  total.find({
-    'Fecha': {
-      '$gte': '2016-02-01T05:54:20.743Z',
-      '$lt': '2016-02-02T06:13:16.074Z'
-    }
-  }, (err: Error | null, doc: any) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.send(doc);
-  });
 });
 
-router.post('/save', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const collection = db?.get('ventas');
-  const pagosTarjetas = db?.get('ventasTarjeta');
-  const pagosTarjetasUno = db?.get('ventasEfectivo');
+router.post('/save', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
+    }
+    
+    const collection = db.get('ventas');
+    const pagosTarjetas = db.get('ventasTarjeta');
+    const pagosEfectivo = db.get('ventasEfectivo');
 
-  const codigo = req.body.codigo;
-  const mesa = req.body.mesa;
-  const hora = req.body.hora;
-  const fecha = req.body.fecha;
-  const total = req.body.total;
-  const metodoPago = req.body.metodoPago;
-  const descuento = req.body.descuento;
-  const descuentoTotal = req.body.descuentoTotal;
+    // Verificar se as coleções estão disponíveis
+    if (!validateCollection(collection, res) || 
+        !validateCollection(pagosTarjetas, res) || 
+        !validateCollection(pagosEfectivo, res)) {
+      return;
+    }
 
-  if (!collection || !pagosTarjetas || !pagosTarjetasUno) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
+    const codigo = req.body.codigo;
+    const mesa = req.body.mesa;
+    const hora = req.body.hora;
+    const fecha = req.body.fecha;
+    const total = req.body.total;
+    const metodoPago = req.body.metodoPago;
+    const descuento = req.body.descuento;
+    const descuentoTotal = req.body.descuentoTotal;
 
-  if (metodoPago === "Efectivo") {
-    pagosTarjetasUno.insert({
+    // Documento de venda
+    const ventaDoc = {
       'Mesa': mesa,
       'Total': total,
       'Codigo': codigo,
@@ -91,164 +118,244 @@ router.post('/save', (req: IUserRequest, res: Response, next: NextFunction) => {
       'Metodopago': metodoPago,
       'Descuento': descuento,
       'DescuentoTotal': descuentoTotal
-    }).success((doc: any) => {
-      res.end(JSON.stringify({ inserted: true }));
-    }).error((err: Error) => {
-      console.log('error');
-      res.status(500).json({ error: 'Error al guardar' });
-    });
+    };
+
+    // Verificar método de pagamento
+    if (metodoPago !== "Efectivo" && metodoPago !== "Tarjeta") {
+      return res.status(400).json({ error: 'Método de pago inválido' });
+    }
+
+    // Executar as operações de banco de dados
+    await executeDbAction(
+      async () => {
+        // Inserir no registro específico pelo método de pagamento
+        if (metodoPago === "Efectivo") {
+          await insertDocument(pagosEfectivo, ventaDoc);
+        } else {
+          await insertDocument(pagosTarjetas, ventaDoc);
+        }
+        
+        // Inserir no registro geral de vendas
+        await insertDocument(collection, ventaDoc);
+      },
+      res,
+      'Venda registrada com sucesso',
+      'Erro ao registrar venda'
+    );
+  } catch (error) {
+    console.error('Erro na rota /save:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao salvar a venda' });
   }
-  else if (metodoPago === "Tarjeta") {
-    pagosTarjetas.insert({
-      'Mesa': mesa,
+});
+
+router.get('/list/:fecha', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
+    }
+    
+    const save = db.get('ventas');
+    const fecha = req.params.fecha;
+
+    // Verificar se a coleção está disponível
+    if (!validateCollection(save, res)) {
+      return;
+    }
+
+    // Buscar vendas pela data
+    await executeDbAction(
+      async () => {
+        const ventas = await findDocuments(save, { 'Fecha': fecha });
+        res.json(ventas);
+      },
+      res,
+      undefined,
+      'Erro ao buscar vendas pela data'
+    );
+  } catch (error) {
+    console.error('Erro na rota /list/:fecha:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao buscar vendas pela data' });
+  }
+});
+
+router.get('/list/tarjetas/:fecha', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
+    }
+    
+    const save = db.get('ventasTarjeta');
+    const fecha = req.params.fecha;
+
+    // Verificar se a coleção está disponível
+    if (!validateCollection(save, res)) {
+      return;
+    }
+
+    // Buscar vendas com cartão pela data
+    await executeDbAction(
+      async () => {
+        const ventas = await findDocuments(save, { 'Fecha': fecha });
+        res.json(ventas);
+      },
+      res,
+      undefined,
+      'Erro ao buscar vendas com cartão pela data'
+    );
+  } catch (error) {
+    console.error('Erro na rota /list/tarjetas/:fecha:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao buscar vendas com cartão' });
+  }
+});
+
+router.get('/list/efectivo/:fecha', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
+    }
+    
+    const save = db.get('ventasEfectivo');
+    const fecha = req.params.fecha;
+
+    // Verificar se a coleção está disponível
+    if (!validateCollection(save, res)) {
+      return;
+    }
+
+    // Buscar vendas em dinheiro pela data
+    await executeDbAction(
+      async () => {
+        const ventas = await findDocuments(save, { 'Fecha': fecha });
+        res.json(ventas);
+      },
+      res,
+      undefined,
+      'Erro ao buscar vendas em dinheiro pela data'
+    );
+  } catch (error) {
+    console.error('Erro na rota /list/efectivo/:fecha:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao buscar vendas em dinheiro' });
+  }
+});
+
+router.post('/savetotal', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
+    }
+    
+    const totalBD = db.get('total');
+    const fecha = req.body.fecha;
+    const total = req.body.total;
+
+    // Verificar se a coleção está disponível
+    if (!validateCollection(totalBD, res)) {
+      return;
+    }
+
+    // Documento de total de vendas
+    const totalDoc = {
       'Total': total,
-      'Codigo': codigo,
-      'Hora': hora,
-      'Fecha': fecha,
-      'Metodopago': metodoPago,
-      'Descuento': descuento,
-      'DescuentoTotal': descuentoTotal
-    }).success((doc: any) => {
-      res.end(JSON.stringify({ inserted: true }));
-    }).error((err: Error) => {
-      console.log('error');
-      res.status(500).json({ error: 'Error al guardar' });
-    });
-  }
-  else {
-    console.log('error');
-    return res.status(400).json({ error: 'Método de pago inválido' });
-  }
+      'Fecha': new Date()
+    };
 
-  collection.insert({
-    'Mesa': mesa,
-    'Total': total,
-    'Codigo': codigo,
-    'Hora': hora,
-    'Fecha': fecha,
-    'Metodopago': metodoPago,
-    'Descuento': descuento,
-    'DescuentoTotal': descuentoTotal
-  }).success((doc: any) => {
-    res.end(JSON.stringify({ inserted: true }));
-  }).error((err: Error) => {
-    console.log('error');
-    res.status(500).json({ error: 'Error al guardar' });
-  });
+    // Inserir total
+    await executeDbAction(
+      async () => {
+        await insertDocument(totalBD, totalDoc);
+      },
+      res,
+      'Total registrado com sucesso',
+      'Erro ao registrar total'
+    );
+  } catch (error) {
+    console.error('Erro na rota /savetotal:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao salvar o total' });
+  }
 });
 
-router.get('/list/:fecha', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const save = db?.get('ventas');
-  const fecha = req.params.fecha;
-
-  if (!save) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
-
-  save.find({ 'Fecha': fecha }, (err: Error | null, doc: any) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
+router.post('/savetotaltarjeta', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
     }
-    res.send(doc);
-  });
-});
+    
+    const totalBD = db.get('totaltarjeta');
+    const fecha = req.body.fecha;
+    const total = req.body.total;
 
-router.get('/list/tarjetas/:fecha', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const save = db?.get('ventasTarjeta');
-  const fecha = req.params.fecha;
-
-  if (!save) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
-
-  save.find({ 'Fecha': fecha }, (err: Error | null, doc: any) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
+    // Verificar se a coleção está disponível
+    if (!validateCollection(totalBD, res)) {
+      return;
     }
-    res.send(doc);
-  });
+
+    // Documento de total de vendas com cartão
+    const totalDoc = {
+      'Total': total,
+      'Fecha': new Date()
+    };
+
+    // Inserir total de cartão
+    await executeDbAction(
+      async () => {
+        await insertDocument(totalBD, totalDoc);
+      },
+      res,
+      'Total de vendas com cartão registrado com sucesso',
+      'Erro ao registrar total de vendas com cartão'
+    );
+  } catch (error) {
+    console.error('Erro na rota /savetotaltarjeta:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao salvar o total de vendas com cartão' });
+  }
 });
 
-router.get('/list/efectivo/:fecha', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const save = db?.get('ventasEfectivo');
-  const fecha = req.params.fecha;
-
-  if (!save) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
-
-  save.find({ 'Fecha': fecha }, (err: Error | null, doc: any) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
+router.post('/savetotalefectivo', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
     }
-    res.send(doc);
-  });
-});
+    
+    const totalBD = db.get('totalefectivo');
+    const fecha = req.body.fecha;
+    const total = req.body.total;
 
-router.post('/savetotal', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const totalBD = db?.get('total');
-  const fecha = req.body.fecha;
-  const total = req.body.total;
+    // Verificar se a coleção está disponível
+    if (!validateCollection(totalBD, res)) {
+      return;
+    }
 
-  if (!totalBD) {
-    return res.status(500).json({ error: 'Database collection not available' });
+    // Documento de total de vendas em dinheiro
+    const totalDoc = {
+      'Total': total,
+      'Fecha': new Date()
+    };
+
+    // Inserir total em dinheiro
+    await executeDbAction(
+      async () => {
+        await insertDocument(totalBD, totalDoc);
+      },
+      res,
+      'Total de vendas em dinheiro registrado com sucesso',
+      'Erro ao registrar total de vendas em dinheiro'
+    );
+  } catch (error) {
+    console.error('Erro na rota /savetotalefectivo:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao salvar o total de vendas em dinheiro' });
   }
-
-  totalBD.insert({
-    'Total': total,
-    'Fecha': new Date()
-  }).success((doc: any) => {
-    res.json({ inserted: true });
-  }).error((err: Error) => {
-    console.log('error');
-    res.status(500).json({ error: 'Error al guardar' });
-  });
-});
-
-router.post('/savetotaltarjeta', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const totalBD = db?.get('totaltarjeta');
-  const fecha = req.body.fecha;
-  const total = req.body.total;
-
-  if (!totalBD) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
-
-  totalBD.insert({
-    'Total': total,
-    'Fecha': new Date()
-  }).success((doc: any) => {
-    res.json({ inserted: true });
-  }).error((err: Error) => {
-    console.log('error');
-    res.status(500).json({ error: 'Error al guardar' });
-  });
-});
-
-router.post('/savetotalefectivo', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const totalBD = db?.get('totaltarjeta');
-  const fecha = req.body.fecha;
-  const total = req.body.total;
-
-  if (!totalBD) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
-
-  totalBD.insert({
-    'Total': total,
-    'Fecha': new Date()
-  }).success((doc: any) => {
-    res.json({ inserted: true });
-  }).error((err: Error) => {
-    console.log('error');
-    res.status(500).json({ error: 'Error al guardar' });
-  });
 });
 
 export default router; 

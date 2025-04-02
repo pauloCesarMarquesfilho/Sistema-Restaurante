@@ -29,10 +29,10 @@
    - ✅ validate.js → src/routes/validate.ts
    - ✅ users.js → src/routes/users.ts
    - ✅ panel.js → src/routes/panel.ts
-   - ✅ mesas.js → src/routes/mesas.ts (atualizado para usar utils)
-   - ✅ apipollos.js → src/routes/apipollos.ts
-   - ✅ ventas.js → src/routes/ventas.ts
-   - ✅ pedidos.js → src/routes/pedidos.ts
+   - ✅ mesas.js → src/routes/mesas.ts (refatorado para usar utilitários)
+   - ✅ apipollos.js → src/routes/apipollos.ts (refatorado para usar utilitários)
+   - ✅ ventas.js → src/routes/ventas.ts (refatorado para usar utilitários)
+   - ✅ pedidos.js → src/routes/pedidos.ts (refatorado para usar utilitários)
    - ✅ admin.js → src/routes/admin.ts (significativamente melhorado)
      - ✅ Rotas de gestão de funcionários:
        - ✅ /addmozos: adicionar garçons
@@ -59,10 +59,45 @@
      - ✅ Rotas de renderização:
        - ✅ /platos, /bebidas, /inventario, /reportes
 
+## Melhorias Implementadas
+
+1. **Refatoração do Arquivo mesas.ts**
+   - ✅ Convertido para async/await 
+   - ✅ Implementado uso de validateCollection para verificação segura
+   - ✅ Utilizado updateDocument para operações de atualização
+   - ✅ Adicionado tratamento adequado de erros com try/catch
+   - ✅ Verificação de existência de registros antes de atualizar
+   - ✅ Uso de executeDbAction para encapsular operações de banco de dados
+
+2. **Refatoração do Arquivo pedidos.ts**
+   - ✅ Substituído formatação manual de data por utilitário getFormattedDateTime
+   - ✅ Convertido callbacks para async/await
+   - ✅ Implementado padrão consistente de verificação de banco de dados
+   - ✅ Removido código duplicado para formatação de data
+   - ✅ Utilizado findDocuments e insertDocument para operações
+   - ✅ Adicionado tratamento de erros abrangente com try/catch
+
+3. **Refatoração do Arquivo ventas.ts**
+   - ✅ Removido importação desnecessária de mongoose
+   - ✅ Convertido todas as rotas para async/await
+   - ✅ Consolidado verificações de coleção com validateCollection
+   - ✅ Simplificado inserções com documentos bem estruturados
+   - ✅ Implementado verificação adequada de método de pagamento
+   - ✅ Melhorado mensagens de erro e feedback ao usuário
+
+4. **Refatoração do Arquivo apipollos.ts**
+   - ✅ Substituído formatação manual de data pelo utilitário getFormattedDateTime
+   - ✅ Convertido callbacks para async/await
+   - ✅ Implementado tratamento de erros consistente com try/catch
+   - ✅ Removido código duplicado e redundante
+   - ✅ Utilizado validateCollection, insertDocument, findDocuments e removeDocument
+   - ✅ Adicionado encapsulamento de operações de banco de dados com executeDbAction
+   - ✅ Melhorado mensagens de erro e resposta ao usuário
+
 ## Tarefas Pendentes
 
 1. **Migração de Arquivos Pendentes**
-   - ✅ Completada a conversão do arquivo admin.js para TypeScript
+   - ✅ Completada a conversão e refatoração das rotas principais do sistema
    - Verificar se há outros arquivos JavaScript que precisam ser convertidos
 
 2. **Refatoração e Melhorias de Código**
@@ -73,7 +108,7 @@
      - ✅ removeDocument: para remover documentos
      - ✅ findDocuments/findOneDocument: para buscar documentos
      - ✅ executeDbAction: para encapsular operações de banco com tratamento de erros
-   - ⚠️ Refatorar outras rotas para usar os novos utilitários
+   - ✅ Refatoradas todas as rotas principais para usar os novos utilitários
    - ⚠️ Melhorar o tratamento de erros com tipos mais específicos
    - ⚠️ Eliminar usos de 'any' restantes no código
    - ⚠️ Implementar validação de dados de entrada
@@ -125,7 +160,7 @@ A conversão inicial de admin.js para admin.ts foi concluída, mas ainda pode se
 
 ## Próximos Passos Imediatos
 
-1. Refatorar as demais rotas em outros arquivos para usar os novos utilitários de banco de dados e data
+1. ✅ Refatorar as demais rotas em outros arquivos para usar os novos utilitários de banco de dados e data
 2. Considerar implementar um sistema de validação para os dados de entrada
 3. Avaliar dividir o arquivo admin.ts em módulos separados por função para melhor manutenção
 4. Compilar o projeto e corrigir quaisquer erros de tipo restantes

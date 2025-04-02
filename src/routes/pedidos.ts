@@ -1,5 +1,7 @@
 import express, { Response, NextFunction, Router } from 'express';
 import { IUserRequest } from '../types';
+import { getFormattedDateTime, formatFullDate } from '../utils/dateFormatter';
+import { validateCollection, insertDocument, findDocuments, findOneDocument, updateDocument, executeDbAction } from '../utils/dbHelpers';
 
 const router: Router = express.Router();
 
@@ -10,246 +12,228 @@ router.get('/', (req: IUserRequest, res: Response, next: NextFunction) => {
   });
 });
 
-router.post('/save', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  
-  const mesa = req.body.mesa;
-  //const personas = req.body.personas;
-  const pedido = req.body.pedido;
-  const precio = req.body.precio;
-  const mozo = req.body.mozo;
-  const codigo = req.body.codigo;
+router.post('/save', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
+    }
+    
+    const mesa = req.body.mesa;
+    //const personas = req.body.personas;
+    const pedido = req.body.pedido;
+    const precio = req.body.precio;
+    const mozo = req.body.mozo;
+    const codigo = req.body.codigo;
 
-  const collection = db?.get('pedidos');
-  const pedidoscerrados = db?.get('pedidoscerrados');
+    const collection = db.get('pedidos');
+    const pedidoscerrados = db.get('pedidoscerrados');
 
-  if (!collection || !pedidoscerrados) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
+    // Verificar se as coleções estão disponíveis
+    if (!validateCollection(collection, res) || !validateCollection(pedidoscerrados, res)) {
+      return;
+    }
 
-  /*Data*/
-  const fecha = new Date();
-  const hora = fecha.getHours();
-  const minutes = fecha.getMinutes();
-  const resultadoHora = hora + ":" + minutes;
+    // Utilizar o utilitário para formatar data e hora
+    const { resultadoHora, resultadoFecha } = getFormattedDateTime();
 
-  let mes: string | number = fecha.getMonth();
-  const ano = fecha.getFullYear();
-  const dia = fecha.getDate();
+    // Documento de pedido
+    const pedidoDoc = {
+      'Mesa': mesa,
+      //'Pedido': pedido,
+      //'Precio': precio,
+      'Mozo': mozo,
+      'Estado': 'Ocupado',
+      'Hora': resultadoHora,
+      'Fecha': resultadoFecha,
+      'Codigo': codigo,
+    };
 
-  if (mes === 0) {
-    mes = "Enero";
-  }
-  else if (mes === 1) {
-    mes = "Febrero";
-  }
-  else if (mes === 2) {
-    mes = "Marzo";
-  }
-  else if (mes === 3) {
-    mes = "Abril";
-  }
-  else if (mes === 4) {
-    mes = "Mayo";
-  }
-  else if (mes === 5) {
-    mes = "Junio";
-  }
-  else if (mes === 6) {
-    mes = "Julio";
-  }
-  else if (mes === 7) {
-    mes = "Agosto";
-  }
-  else if (mes === 8) {
-    mes = "Septiembre";
-  }
-  else if (mes === 9) {
-    mes = "Octubre";
-  }
-  else if (mes === 10) {
-    mes = "Noviembre";
-  }
-  else if (mes === 11) {
-    mes = "Diciembre";
-  }
-  else {
-    mes = "Ningun mes se encontro";
-  }
-  const resultadoFecha = "El " + dia + " de " + mes + " del " + ano;
+    // Documento de pedido fechado
+    const pedidoCerradoDoc = {
+      'Mesa': mesa,
+      //'Pedido': pedido,
+      //'Precio': precio,
+      'Mozo': mozo,
+      'Estado': 'Cerrado',
+      'Hora': resultadoHora,
+      'Fecha': resultadoFecha,
+      'Codigo': codigo
+    };
 
-  /*End Data*/
-
-  collection.insert({
-    'Mesa': mesa,
-    //'Pedido': pedido,
-    //'Precio': precio,
-    'Mozo': mozo,
-    'Estado': 'Ocupado',
-    'Hora': resultadoHora,
-    'Fecha': resultadoFecha,
-    'Codigo': codigo,
-  }).success((doc: any) => {
-    res.json({ inserted: true });
-  }).error((err: Error) => {
-    console.log('error');
-    res.status(500).json({ error: 'Error al guardar' });
-  });
-
-  pedidoscerrados.insert({
-    'Mesa': mesa,
-    //'Pedido': pedido,
-    //'Precio': precio,
-    'Mozo': mozo,
-    'Estado': 'Cerrado',
-    'Hora': resultadoHora,
-    'Fecha': resultadoFecha,
-    'Codigo': codigo
-  });
+    // Inserir os documentos usando executeDbAction
+    await executeDbAction(
+      async () => {
+        // Inserir pedido
+        await insertDocument(collection, pedidoDoc);
+        // Inserir pedido fechado
+        await insertDocument(pedidoscerrados, pedidoCerradoDoc);
+      },
+      res,
+      'Pedido salvo com sucesso',
+      'Erro ao salvar pedido'
+    );
+  } catch (error) {
+    console.error('Erro na rota /save:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao salvar o pedido' });
+  }
 });
 
-router.get('/show', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const collection = db?.get('pedidos');
-
-  if (!collection) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
-
-  collection.find({}, (err: Error | null, doc: any) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
+router.get('/show', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
     }
-    res.json(doc);
-  });
+    
+    const collection = db.get('pedidos');
+
+    // Verificar se a coleção está disponível
+    if (!validateCollection(collection, res)) {
+      return;
+    }
+
+    // Buscar todos os pedidos
+    await executeDbAction(
+      async () => {
+        const pedidos = await findDocuments(collection, {});
+        res.json(pedidos);
+      },
+      res,
+      undefined,
+      'Erro ao buscar pedidos'
+    );
+  } catch (error) {
+    console.error('Erro na rota /show:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao buscar os pedidos' });
+  }
 });
 
-router.get('/pedidounico/:id', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const id = req.params.id;
-  const db = req.db;
-  const pedido = db?.get('pedidos');
-
-  if (!pedido) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
-
-  pedido.find({ '_id': id }, (err: Error | null, doc: any) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
+router.get('/pedidounico/:id', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id;
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
     }
-    res.json(doc);
-  });
+    
+    const pedido = db.get('pedidos');
+
+    // Verificar se a coleção está disponível
+    if (!validateCollection(pedido, res)) {
+      return;
+    }
+
+    // Buscar pedido pelo ID
+    await executeDbAction(
+      async () => {
+        const foundPedido = await findDocuments(pedido, { '_id': id });
+        res.json(foundPedido);
+      },
+      res,
+      undefined,
+      'Erro ao buscar pedido'
+    );
+  } catch (error) {
+    console.error('Erro na rota /pedidounico/:id:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao buscar o pedido' });
+  }
 });
 
 //aqui me de borrando el pedido de las mesas
-router.post('/show/pedido/:id/', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const pedido = db?.get('pedidos');
-  //const borrar = req.params.borrar;
-  const pedidoBorrar = req.body.borrar;
-  const id = req.params.id;
-
-  if (!pedido) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
-
-  pedido.findOne({ '_id': id }, (err: Error | null, doc: any) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
+router.post('/show/pedido/:id/', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
     }
     
-    pedido.update(
-      { '_id': id },
-      {
-        $pull: {
-          'Pedido': pedidoBorrar
-        }
-      }
+    const pedidoBorrar = req.body.borrar;
+    const id = req.params.id;
+    const pedido = db.get('pedidos');
+
+    // Verificar se a coleção está disponível
+    if (!validateCollection(pedido, res)) {
+      return;
+    }
+
+    // Verificar se o pedido existe
+    const foundPedido = await findOneDocument(pedido, { '_id': id });
+    if (!foundPedido) {
+      return res.status(404).json({ error: 'Pedido não encontrado' });
+    }
+
+    // Atualizar removendo o item do pedido
+    await executeDbAction(
+      async () => {
+        await updateDocument(
+          pedido,
+          { '_id': id },
+          {
+            $pull: {
+              'Pedido': pedidoBorrar
+            }
+          }
+        );
+      },
+      res,
+      'Item removido do pedido com sucesso',
+      'Erro ao remover item do pedido'
     );
-  }).success((doc: any) => {
-    console.log('se borro');
-    res.json({ success: true });
-  }).error((err: Error) => {
-    console.log(err);
-    res.status(500).json({ error: 'Error al borrar pedido' });
-  });
+  } catch (error) {
+    console.error('Erro na rota /show/pedido/:id/:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao processar a solicitação' });
+  }
 });
 
-router.post('/mesas', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const db = req.db;
-  const mesa = req.body.mesa;
-  const mozo = req.body.mozo;
-  const codigo = req.body.codigo;
-  const collection = db?.get('mesas');
+router.post('/mesas', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
+    }
+    
+    const mesa = req.body.mesa;
+    const mozo = req.body.mozo;
+    const codigo = req.body.codigo;
+    const collection = db.get('mesas');
 
-  if (!collection) {
-    return res.status(500).json({ error: 'Database collection not available' });
-  }
+    // Verificar se a coleção está disponível
+    if (!validateCollection(collection, res)) {
+      return;
+    }
 
-  /*Data*/
-  const fecha = new Date();
-  const hora = fecha.getHours();
-  const minutes = fecha.getMinutes();
-  const resultadoHora = hora + ":" + minutes;
+    // Utilizar o utilitário para formatar data e hora
+    const { resultadoHora, resultadoFecha } = getFormattedDateTime();
 
-  let mes: string | number = fecha.getMonth();
-  const ano = fecha.getFullYear();
-  const dia = fecha.getDate();
+    // Documento da mesa
+    const mesaDoc = {
+      'Mesa': mesa,
+      'Mozo': mozo,
+      'Estado': 'Ocupado',
+      'Hora': resultadoHora,
+      'Fecha': resultadoFecha,
+      'Codigo': codigo
+    };
 
-  if (mes === 0) {
-    mes = "Enero";
+    // Inserir documento usando executeDbAction
+    await executeDbAction(
+      async () => {
+        await insertDocument(collection, mesaDoc);
+      },
+      res,
+      'Mesa registrada com sucesso',
+      'Erro ao registrar mesa'
+    );
+  } catch (error) {
+    console.error('Erro na rota /mesas:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao processar a solicitação' });
   }
-  else if (mes === 1) {
-    mes = "Febrero";
-  }
-  else if (mes === 2) {
-    mes = "Marzo";
-  }
-  else if (mes === 3) {
-    mes = "Abril";
-  }
-  else if (mes === 4) {
-    mes = "Mayo";
-  }
-  else if (mes === 5) {
-    mes = "Junio";
-  }
-  else if (mes === 6) {
-    mes = "Julio";
-  }
-  else if (mes === 7) {
-    mes = "Agosto";
-  }
-  else if (mes === 8) {
-    mes = "Septiembre";
-  }
-  else if (mes === 9) {
-    mes = "Octubre";
-  }
-  else if (mes === 10) {
-    mes = "Noviembre";
-  }
-  else if (mes === 11) {
-    mes = "Diciembre";
-  }
-  else {
-    mes = "Ningun mes se encontro";
-  }
-  const resultadoFecha = "El " + dia + " de " + mes + " del " + ano;
-
-  collection.insert({
-    'Mesa': mesa,
-    'Mozo': mozo,
-    'Estado': 'Ocupado',
-    'Hora': resultadoHora,
-    'Fecha': resultadoFecha,
-    'Codigo': codigo
-  }).success((doc: any) => {
-    res.json({ inserted: true });
-  }).error((err: Error) => {
-    console.log('error');
-    res.status(500).json({ error: 'Error al guardar' });
-  });
 });
 
 export default router; 

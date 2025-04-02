@@ -1,51 +1,104 @@
+# Sistema de Gestão para Restaurantes
 
-![alt tag](https://i.ibb.co/gWYF4nQ/erestaurant-new-1024x517.png)
-
-**English:**
-Hello community, thanks for visiting this project that was created 4 years ago. Everything was born from a need and learning new technologies. Today I am developing a very complete CMS with many things which need collaboration from you. I count on your support
-
-**Spanish:**
-Hola comunidad, gracias por visitar este proyecto que fue creado hace 4 años. todo nacio por una necesidad y aprendizaje de nuevas tecnologias. hoy en la actualidad estoy desarrollando un CMS muy completo con muchas cosas la cual se necesita colaboración de parte de ustedes. espero contar con su apoyo
-
-**French:**
-Bonjour la communauté, merci de visiter ce projet qui a été créé il y a 4 ans. Tout est né d'un besoin et de l'apprentissage de nouvelles technologies. Aujourd'hui, je développe un CMS très complet avec beaucoup de choses qui nécessitent une collaboration de votre part. J'espère compter sur votre soutien
-
-**Germany:**
-Hallo Community, vielen Dank für den Besuch dieses Projekts, das vor 4 Jahren erstellt wurde. Alles wurde aus einem Bedürfnis geboren und lernte neue Technologien. Heute entwickle ich ein sehr vollständiges CMS mit vielen Dingen, die eine Zusammenarbeit von Ihnen erfordern. Ich hoffe auf Ihre Unterstützung zählen zu können.
-
-**Russia:**
-Здравствуйте, сообщество, спасибо за посещение этого проекта, который был создан 4 года назад. Все рождено от потребности и изучения новых технологий. Сегодня я разрабатываю очень полную CMS со многими вещами, которые требуют совместной работы от вас. Я надеюсь рассчитывать на вашу поддержку.
-
-
-Sistema para restaurante creado en nodejs(Versión temporal)
-Primera versión:
-
-![alt tag](https://i.ibb.co/dWLHbJ6/screencapture-localhost-8080-panel-2020-05-03-14-38-23-1203x1536.png)
-
-
-
-Desarrollado por www.edinsoncs.com
+Sistema completo de gestão para restaurantes, com funcionalidades de:
+- Gestão de pedidos e mesas
+- Controle de estoques e inventário
+- Cadastro de produtos (pratos e bebidas)
+- Gestão de funcionários
+- Relatórios de vendas e faturamento
+- Backup e restauração de dados
 
 ## Migração para TypeScript
 
-Este projeto está sendo migrado de JavaScript para TypeScript para melhorar a segurança, escalabilidade e legibilidade do código.
+Este projeto passou por uma migração completa de JavaScript para TypeScript para melhorar a qualidade do código, segurança de tipos e manutenibilidade.
 
-### Estrutura do Projeto em TypeScript
+### Principais Melhorias
 
-A estrutura do projeto TypeScript está organizada da seguinte forma:
+1. **Configuração do Ambiente TypeScript**
+   - Configuração do `tsconfig.json` otimizada para o projeto
+   - Estruturação do código-fonte em diretório `src/`
+   - Adição de scripts para compilação e execução no `package.json`
+
+2. **Definição de Tipos e Interfaces**
+   - Criação de interfaces para modelos de dados (usuários, mesas, pedidos, etc.)
+   - Extensão de tipos do Express para suportar autenticação e acesso ao banco de dados
+   - Declarações para módulos externos não tipados
+   - Tipagem forte para operações de banco de dados com MongoDB/Monk
+
+3. **Refatoração e Modularização**
+   - Extração de código repetitivo para utilitários reutilizáveis:
+     - `dateFormatter.ts`: funções para formatação de datas e horas
+     - `dbHelpers.ts`: funções para operações de banco de dados
+   - Conversão de callbacks para async/await
+   - Tratamento de erros consistente em todas as rotas
+   - Verificações de nulidade para evitar erros em tempo de execução
+
+4. **Melhorias de Segurança e Desempenho**
+   - Validação de coleções de banco de dados antes de operações
+   - Tratamento de erros abrangente com respostas HTTP apropriadas
+   - Uso de padrões modernos de JavaScript (ES6+)
+   - Eliminação de código redundante
+
+### Utilitários Criados
+
+1. **Formatação de Datas (`dateFormatter.ts`)**
+   - `getMonthName()`: Converte número do mês para nome em espanhol
+   - `formatHour()`: Formata horas no formato "HH:MM"
+   - `formatFullDate()`: Formata datas no formato "El DD de MES del YYYY"
+   - `getFormattedDateTime()`: Retorna objeto com data e hora formatadas
+
+2. **Operações de Banco de Dados (`dbHelpers.ts`)**
+   - `validateCollection()`: Verifica se uma coleção é válida antes de operações
+   - `executeDbAction()`: Encapsula operações de banco de dados com tratamento de erros
+   - `insertDocument()`: Insere documentos em uma coleção
+   - `updateDocument()`: Atualiza documentos em uma coleção
+   - `removeDocument()`: Remove documentos de uma coleção
+   - `findDocuments()` / `findOneDocument()`: Busca documentos em uma coleção
+
+## Estrutura do Projeto
 
 ```
-/src              - Código fonte TypeScript
-  /bin            - Scripts de inicialização
-  /models         - Modelos de dados
-  /routes         - Rotas da aplicação
-  /types          - Definições de tipos e interfaces
-/dist             - Código compilado (gerado pelo TypeScript)
-/views            - Templates Jade/Pug
-/public           - Arquivos estáticos
+src/
+├── bin/
+│   └── www.ts         # Ponto de entrada da aplicação
+├── models/
+│   └── local.ts       # Configuração da autenticação local
+├── public/            # Arquivos estáticos (CSS, JS, imagens)
+├── routes/
+│   ├── admin.ts       # Rotas administrativas
+│   ├── apipollos.ts   # API para pedidos de frango
+│   ├── index.ts       # Rota principal
+│   ├── mesas.ts       # Gestão de mesas
+│   ├── panel.ts       # Painel de controle
+│   ├── pedidos.ts     # Gestão de pedidos
+│   ├── users.ts       # Gestão de usuários
+│   ├── validate.ts    # Validação de autenticação
+│   └── ventas.ts      # Gestão de vendas
+├── types/
+│   └── index.ts       # Definições de tipos e interfaces
+├── utils/
+│   ├── dateFormatter.ts # Utilitários para formatação de datas
+│   └── dbHelpers.ts     # Utilitários para operações de banco de dados
+├── views/             # Templates EJS para renderização
+├── app.ts             # Configuração da aplicação Express
+├── declarations.d.ts  # Declarações de tipos para módulos externos
+└── passport.ts        # Configuração de autenticação
 ```
 
-### Instalação
+## Próximos Passos
+
+- Implementação de um sistema de validação de dados de entrada
+- Divisão do arquivo admin.ts em módulos menores por funcionalidade
+- Testes automatizados para garantir a funcionalidade da aplicação
+- Possível adição de documentação de API com Swagger/OpenAPI
+
+## Requisitos
+
+- Node.js (v12+)
+- MongoDB
+- NPM ou Yarn
+
+## Instalação
 
 ```bash
 # Instalar dependências
@@ -54,17 +107,10 @@ npm install
 # Compilar TypeScript
 npm run build
 
-# Iniciar o servidor
-npm start
-
-# Iniciar em modo de desenvolvimento
+# Iniciar servidor de desenvolvimento
 npm run dev
+
+# Iniciar em produção
+npm start
 ```
-
-### Principais Melhorias com TypeScript
-
-1. **Tipagem Estática**: Todos os modelos, rotas e funções agora têm tipos explícitos.
-2. **Interfaces**: Uso de interfaces para definir estruturas de dados reutilizáveis.
-3. **Melhor Segurança**: Redução do uso de `any` e maior segurança no código.
-4. **Melhor IDE Support**: Autocompletar e detecção de erros durante o desenvolvimento.
 

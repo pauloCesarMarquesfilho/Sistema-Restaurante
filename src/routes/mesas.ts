@@ -2,7 +2,7 @@ import express, { Response, NextFunction, Router } from 'express';
 import { ObjectID } from 'mongodb';
 import { IUserRequest } from '../types';
 import { getFormattedDateTime } from '../utils/dateFormatter';
-import { validateCollection } from '../utils/dbHelpers';
+import { validateCollection, updateDocument, findOneDocument, executeDbAction } from '../utils/dbHelpers';
 
 const router: Router = express.Router();
 
@@ -13,95 +13,112 @@ router.get('/', (req: IUserRequest, res: Response, next: NextFunction) => {
   });
 });
 
-router.post('/edit/:id', (req: IUserRequest, res: Response, next: NextFunction) => {
-  const id = req.params.id;
-  const db = req.db;
-  
-  const collection = db?.get('pedidos');
-  const mesa = req.body.mesa;
-  const personas = req.body.personas;
-  const pedido = req.body.pedido;
-  const mozo = req.body.mozo;
-  const comentarios = req.body.comentarios;
-  console.log(comentarios);
-
-  const descuento = req.body.descuento;
-  const metodoPago = req.body.metodoPago;
-  
-  const pedidosCant = req.body.pedidosCant;
-  const pedidosPrecio = req.body.precio;
-
-  // Usar utilitário para formatar data e hora
-  const { resultadoHora, resultadoFecha } = getFormattedDateTime();
-
-  // Verificar se a coleção está disponível
-  if (!validateCollection(collection, res)) {
-    return;
-  }
-
-  // A partir daqui, sabemos que collection não é undefined
-  const safeCollection = collection!;
-
-  safeCollection.findOne({ '_id': id }, (err: Error | null, doc: any) => {
+router.post('/edit/:id', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id;
+    const db = req.db;
     
-    if (pedidosCant === undefined) {
-      console.log('error');
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
     }
-    else {
-      safeCollection.update(
-        { _id: new ObjectID(id) },
-        {
-          '$push': {
-            'Adicionales': {
-              'Precio': pedidosCant,
-              'Pedido': pedidosPrecio
+    
+    const collection = db.get('pedidos');
+    const mesa = req.body.mesa;
+    const personas = req.body.personas;
+    const pedido = req.body.pedido;
+    const mozo = req.body.mozo;
+    const comentarios = req.body.comentarios;
+    const descuento = req.body.descuento;
+    const metodoPago = req.body.metodoPago;
+    const pedidosCant = req.body.pedidosCant;
+    const pedidosPrecio = req.body.precio;
+
+    // Usar utilitário para formatar data e hora
+    const { resultadoHora, resultadoFecha } = getFormattedDateTime();
+
+    // Verificar se a coleção está disponível
+    if (!validateCollection(collection, res)) {
+      return;
+    }
+
+    // Verificar se o pedido existe
+    const existingPedido = await findOneDocument(collection, { '_id': new ObjectID(id) });
+    if (!existingPedido) {
+      return res.status(404).json({ error: 'Pedido não encontrado' });
+    }
+
+    // Atualizar pedidos adicionais se fornecidos
+    if (pedidosCant !== undefined) {
+      await executeDbAction(
+        async () => {
+          await updateDocument(
+            collection,
+            { _id: new ObjectID(id) },
+            {
+              '$push': {
+                'Adicionales': {
+                  'Precio': pedidosCant,
+                  'Pedido': pedidosPrecio
+                }
+              }
             }
-          }
-        }
-      ).success((doc: any) => {
-        res.json({ inserted: true });
-      }).error((err: Error) => {
-        console.log('hubo error' + err);
-      });
+          );
+        },
+        res,
+        undefined,
+        'Erro ao atualizar pedidos adicionais'
+      );
     }
-      
+    
+    // Atualizar desconto se fornecido
     if (descuento > 0) {
-      safeCollection.update(
-        { _id: new ObjectID(id) },
-        {
-          $set: { 'Descuento': descuento }
-        }
-      )
-      .success((doc: any) => {
-        res.end(JSON.stringify({ inserted: true }));
-      });
-    }
-    else {
-      console.log('error');
+      await executeDbAction(
+        async () => {
+          await updateDocument(
+            collection,
+            { _id: new ObjectID(id) },
+            { $set: { 'Descuento': descuento } }
+          );
+        },
+        res,
+        undefined,
+        'Erro ao atualizar desconto'
+      );
     }
 
+    // Atualizar método de pagamento se fornecido
     if (metodoPago === "Efectivo" || metodoPago === "Tarjeta") {
-      safeCollection.update(
-        { _id: new ObjectID(id) },
-        {
-          $set: { 'MetodoPago': metodoPago }
-        }
-      )
-      .success((doc: any) => {
-        res.end(JSON.stringify({ inserted: true }));
-      });
+      await executeDbAction(
+        async () => {
+          await updateDocument(
+            collection,
+            { _id: new ObjectID(id) },
+            { $set: { 'MetodoPago': metodoPago } }
+          );
+        },
+        res,
+        undefined,
+        'Erro ao atualizar método de pagamento'
+      );
     }
 
-    safeCollection.update(
-      { _id: new ObjectID(id) },
-      {
-        $set: { 'Comentarios': comentarios }
-      }
-    )
-    .success((doc: any) => {
-      res.end(JSON.stringify({ inserted: true }));
-    });
-  });
+    // Atualizar comentários
+    await executeDbAction(
+      async () => {
+        await updateDocument(
+          collection,
+          { _id: new ObjectID(id) },
+          { $set: { 'Comentarios': comentarios } }
+        );
+      },
+      res,
+      'Pedido atualizado com sucesso',
+      'Erro ao atualizar comentários'
+    );
+  } catch (error) {
+    console.error('Erro na rota /edit/:id:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao processar a solicitação' });
+  }
 });
 
 export default router; 
