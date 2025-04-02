@@ -77,7 +77,7 @@ declare module 'monk' {
   }
 
   export interface Collection {
-    find(query: any, callback?: (err: Error | null, docs: any[]) => void): any;
+    find(query: any, options?: any, callback?: (err: Error | null, docs: any[]) => void): any;
     findOne(query: any, callback?: (err: Error | null, doc: any) => void): any;
     insert(document: any): { success: (callback: (doc: any) => void) => { error: (callback: (err: Error) => void) => void } };
     update(query: any, update: any): { success: (callback: (doc: any) => void) => any };
