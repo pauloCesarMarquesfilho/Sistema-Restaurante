@@ -1,3 +1,5 @@
+# teste para validar cursor, peguei um sistema ja feito e fiz o agente sem muita surpervisão alterar o codigo.
+
 # Sistema de Gestão para Restaurantes
 
 Sistema completo de gestão para restaurantes, com funcionalidades de:
