@@ -6,7 +6,9 @@
     "start": "node ./dist/bin/www",
     "build": "tsc",
     "dev": "tsc --watch & nodemon ./dist/bin/www",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "body-parser": "~1.20.2",
@@ -24,9 +26,9 @@
     "node-thermal-printer": "0.0.11",
     "passport": "^0.3.2",
     "passport-local": "^1.0.0",
-    "serve-favicon": "~2.3.0",
     "react": "~16.6.0",
     "react-dom": "~16.6.0",
+    "serve-favicon": "~2.3.0",
     "ts-loader": "~5.3.0",
     "typescript": "~3.1.5",
     "webpack": "~4.23.1",
@@ -38,6 +40,7 @@
     "@types/debug": "^4.1.5",
     "@types/express": "^4.17.9",
     "@types/express-session": "^1.17.3",
+    "@types/jest": "^29.5.14",
     "@types/mongodb": "^3.6.3",
     "@types/mongoose": "^5.10.3",
     "@types/morgan": "^1.9.2",
@@ -47,6 +50,10 @@
     "@types/react": "^16.9.56",
     "@types/react-dom": "^16.9.9",
     "@types/serve-favicon": "^2.5.2",
-    "nodemon": "^2.0.6"
+    "@types/supertest": "^6.0.3",
+    "jest": "^29.7.0",
+    "nodemon": "^2.0.6",
+    "supertest": "^6.3.4",
+    "ts-jest": "^29.3.1"
   }
 }

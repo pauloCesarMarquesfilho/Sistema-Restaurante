@@ -26,10 +26,15 @@ export interface IMesa {
 // Interface para o modelo de pedido
 export interface IPedido {
   mesa: number;
-  estado: 'pendiente' | 'preparando' | 'listo' | 'entregado';
   productos: IPedidoProducto[];
-  fecha: Date;
   total: number;
+  estado: 'Ocupado' | 'Cerrado' | 'Libre';
+  hora: string;
+  fecha: string;
+  mozo?: string;
+  comentarios?: string;
+  descuento?: number;
+  metodoPago?: string;
 }
 
 // Interface para produtos em um pedido
@@ -86,11 +91,14 @@ export interface IPlatoCategoria {
 
 // Interface para registro de venda
 export interface IVenta {
-  mesa: number;
-  productos: IPedidoProducto[];
-  fecha: Date;
-  total: number;
-  metodo_pago: 'efectivo' | 'tarjeta' | 'otro';
+  Total: number;
+  Metodopago: string;
+  Fecha: Date;
+  Hora: string;
+  Mesa?: string;
+  Codigo?: string;
+  Descuento?: number;
+  DescuentoTotal?: number;
 }
 
 // Interface para o garçom (mozo)

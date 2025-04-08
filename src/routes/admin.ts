@@ -3,6 +3,8 @@ import { ObjectID } from 'mongodb';
 import { IUserRequest, IPlato, CategoriaPlato, IMozo, IStockItem, IVenta } from '../types';
 import { getFormattedDateTime, formatFullDate } from '../utils/dateFormatter';
 import { validateCollection, insertDocument, removeDocument, executeDbAction, findDocuments, updateDocument, findOneDocument } from '../utils/dbHelpers';
+import { COLLECTIONS, PAYMENT_METHODS, STATES } from '../constants/collections';
+import { validateMozoData, validateProductData, validateSaleData } from '../utils/validators';
 
 const router: Router = express.Router();
 
@@ -28,16 +30,20 @@ router.post('/addmozos', async (req: IUserRequest, res: Response, next: NextFunc
       return res.status(500).json({ error: 'Database not accessible' });
     }
     
-    const nombre = req.body.nombre;
-    const email = req.body.email;
-    const celular = req.body.celular;
-    
-    const collection = db.get('mozos');
+    const collection = db.get(COLLECTIONS.MOZOS);
     
     // Verificar se a coleção está disponível
     if (!validateCollection(collection, res)) {
       return;
     }
+
+    // Validar dados de entrada
+    const validation = validateMozoData(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ error: 'Dados inválidos', details: validation.errors });
+    }
+
+    const { nombre, email, celular } = req.body;
 
     // Criar documento para inserção
     const mozoDocument: IMozo = {
@@ -178,131 +184,50 @@ router.post('/addplatos', async (req: IUserRequest, res: Response, next: NextFun
       return res.status(500).json({ error: 'Database not accessible' });
     }
 
+    // Validar dados de entrada
+    const validation = validateProductData(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ error: 'Dados inválidos', details: validation.errors });
+    }
+
+    const { nombre, precio, codigo, categoria } = req.body;
+
     // Obter as coleções necessárias
-    const collection = db.get('platos');
-    const ceviches = db.get('ceviches');
-    const entradas = db.get('entradas');
-    const tiraditos = db.get('tiraditos');
-    const lechetigre = db.get('lechetigre');
-    const sudadosChupes = db.get('sudadosChupes');
-    const segundosMarinos = db.get('segundosMarinos');
-    const chicharonesMarinos = db.get('chicharonesMarinos');
-    const trilogias = db.get('trilogias');
-    const tacu = db.get('tacu');
-    const chicha = db.get('chicha');
-    const guarniciones = db.get('guarniciones');
-    const sopasCriollas = db.get('sopasCriollas');
-    const chifas = db.get('chifas');
-    const pollobrasa = db.get('pollobrasa');
-    const pescadosmariscos = db.get('pescadosmariscos');
-    const bebidasCollection = db.get('bebidas');
+    const collection = db.get(COLLECTIONS.PLATOS);
+    const targetCollection = db.get(categoria);
 
-    const nombre = req.body.nombre;
-    const precio = req.body.precio;
-    const categoria = req.body.categoria;
-    const codigo = req.body.codigo;
-
-    // Objeto base para inserção usando a interface IPlato
-    const baseItem: IPlato = {
-      'Nombre': nombre,
-      'Precio': precio,
-      'Categoria': categoria,
-      'Codigo': codigo
-    };
-
-    // Objeto para coleções específicas
-    const categoriaItem = {
-      [categoria]: baseItem
-    };
-
-    // Verificar se a categoria é válida utilizando o enum CategoriaPlato
-    const categoriaValida = Object.values(CategoriaPlato).includes(categoria as CategoriaPlato);
-    if (!categoriaValida) {
-      return res.status(400).json({ error: 'Categoria inválida' });
-    }
-
-    // Inserir na coleção correspondente à categoria
-    let targetCollection;
-
-    switch (categoria as CategoriaPlato) {
-      case CategoriaPlato.CEVICHES:
-        targetCollection = ceviches;
-        break;
-      case CategoriaPlato.ENTRADAS:
-        targetCollection = entradas;
-        break;
-      case CategoriaPlato.TIRADITOS:
-        targetCollection = tiraditos;
-        break;
-      case CategoriaPlato.LECHE_TIGRE:
-        targetCollection = lechetigre;
-        break;
-      case CategoriaPlato.SUDADOS_CHUPES:
-        targetCollection = sudadosChupes;
-        break;
-      case CategoriaPlato.SEGUNDOS_MARINOS:
-        targetCollection = segundosMarinos;
-        break;
-      case CategoriaPlato.CHICHARONES_MARINOS:
-        targetCollection = chicharonesMarinos;
-        break;
-      case CategoriaPlato.TRILOGIAS:
-        targetCollection = trilogias;
-        break;
-      case CategoriaPlato.TACUTACU:
-        targetCollection = tacu;
-        break;
-      case CategoriaPlato.CHICHA:
-        targetCollection = chicha;
-        break;
-      case CategoriaPlato.GUARNICIONES:
-        targetCollection = guarniciones;
-        break;
-      case CategoriaPlato.SOPAS_CRIOLLAS:
-        targetCollection = sopasCriollas;
-        break;
-      case CategoriaPlato.CHIFA:
-        targetCollection = chifas;
-        break;
-      case CategoriaPlato.POLLO_BRASA:
-        targetCollection = pollobrasa;
-        break;
-      case CategoriaPlato.PESCADOS_MARISCOS:
-        targetCollection = pescadosmariscos;
-        break;
-      case CategoriaPlato.BEBIDAS:
-        targetCollection = bebidasCollection;
-        break;
-      default:
-        return res.status(400).json({ error: 'Categoria inválida' });
-    }
-
-    // Verificar se a coleção principal e específica existem
+    // Verificar se as coleções estão disponíveis
     if (!validateCollection(collection, res) || !validateCollection(targetCollection, res)) {
       return;
     }
 
-    // Usar o utilitário executeDbAction para inserir os documentos
-    const success = await executeDbAction(
+    // Criar documentos para inserção
+    const platoMainDoc: IPlato = {
+      'Nombre': nombre,
+      'Precio': precio,
+      'Codigo': codigo,
+      'Categoria': categoria
+    };
+
+    const platoCategoryDoc = {
+      'Nombre': nombre,
+      'Precio': precio,
+      'Codigo': codigo
+    };
+
+    // Inserir em ambas as coleções
+    await executeDbAction(
       async () => {
-        await insertDocument(targetCollection!, categoriaItem);
-        await insertDocument(collection, baseItem);
+        await insertDocument(collection, platoMainDoc);
+        await insertDocument(targetCollection, platoCategoryDoc);
       },
       res,
-      undefined,
-      'Erro ao inserir documentos'
+      `Prato '${nombre}' adicionado com sucesso`,
+      'Erro ao adicionar prato'
     );
-
-    // Se a operação foi bem sucedida, enviar resposta personalizada
-    if (success) {
-      res.json({
-        inserted: true,
-        message: `Prato '${nombre}' adicionado com sucesso na categoria ${categoria}`
-      });
-    }
   } catch (error) {
-    console.error('Error en /addplatos:', error);
-    res.status(500).json({ error: 'Ocurrio un error al guardar' });
+    console.error('Erro na rota /addplatos:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao adicionar o prato' });
   }
 });
 
@@ -872,6 +797,59 @@ router.post('/restore', async (req: IUserRequest, res: Response, next: NextFunct
   } catch (error) {
     console.error('Erro na rota /restore:', error);
     res.status(500).json({ error: 'Ocorreu um erro ao restaurar o backup' });
+  }
+});
+
+router.post('/save', async (req: IUserRequest, res: Response, next: NextFunction) => {
+  try {
+    const db = req.db;
+    if (!db) {
+      return res.status(500).json({ error: 'Database not accessible' });
+    }
+
+    // Validar dados de entrada
+    const validation = validateSaleData(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ error: 'Dados inválidos', details: validation.errors });
+    }
+
+    const { total, metodoPago } = req.body;
+
+    // Obter as coleções necessárias
+    const collection = db.get(COLLECTIONS.VENTAS);
+    const pagosTarjetas = db.get(COLLECTIONS.VENTAS_TARJETA);
+    const pagosEfectivo = db.get(COLLECTIONS.VENTAS_EFECTIVO);
+
+    // Verificar se as coleções estão disponíveis
+    if (!validateCollection(collection, res) || 
+        !validateCollection(pagosTarjetas, res) || 
+        !validateCollection(pagosEfectivo, res)) {
+      return;
+    }
+
+    // Criar documento de venda
+    const ventaDoc: IVenta = {
+      'Total': total,
+      'Metodopago': metodoPago,
+      'Fecha': new Date(),
+      'Hora': new Date().toLocaleTimeString()
+    };
+
+    // Inserir na coleção apropriada
+    const targetCollection = metodoPago === PAYMENT_METHODS.TARJETA ? pagosTarjetas : pagosEfectivo;
+    
+    await executeDbAction(
+      async () => {
+        await insertDocument(collection, ventaDoc);
+        await insertDocument(targetCollection, ventaDoc);
+      },
+      res,
+      'Venda registrada com sucesso',
+      'Erro ao registrar venda'
+    );
+  } catch (error) {
+    console.error('Erro na rota /save:', error);
+    res.status(500).json({ error: 'Ocorreu um erro ao registrar a venda' });
   }
 });
 
